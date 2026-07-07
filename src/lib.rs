@@ -16,6 +16,7 @@ use thiserror::Error;
 
 const DEFAULT_ALGORITHM: &str = "PBKDF2/SHA-256";
 const DEFAULT_COST: u32 = 5_000;
+const TEST_COST: u32 = 1_000;
 const DEFAULT_TTL_SECS: u64 = 600;
 const MIN_SECRET_LEN: usize = 32;
 
@@ -92,7 +93,7 @@ impl HumanCheck {
             enabled: true,
             hmac_secret: hmac_secret.to_string(),
             key_secret: key_secret.to_string(),
-            cost: DEFAULT_COST,
+            cost: TEST_COST,
             ttl_secs: DEFAULT_TTL_SECS,
         }
     }

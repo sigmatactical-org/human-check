@@ -7,10 +7,10 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use altcha::{
-    create_challenge, verify_server_signature, verify_solution, Challenge, CreateChallengeOptions,
-    Payload, ServerSignaturePayload, VerifySolutionOptions,
+    Challenge, CreateChallengeOptions, Payload, ServerSignaturePayload, VerifySolutionOptions,
+    create_challenge, verify_server_signature, verify_solution,
 };
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use rand::Rng;
 use thiserror::Error;
 
@@ -117,9 +117,7 @@ impl HumanCheck {
     /// Issue a fresh signed challenge (JSON-serializable [`Challenge`]).
     pub fn issue_challenge(&self) -> Result<Challenge, HumanCheckError> {
         if !self.enabled {
-            return Err(HumanCheckError::Config(
-                "human check is disabled".into(),
-            ));
+            return Err(HumanCheckError::Config("human check is disabled".into()));
         }
         let expires_at = unix_now().saturating_add(self.ttl_secs);
         let counter = rand::rng().random_range(5_000..=10_000);
@@ -153,8 +151,8 @@ impl HumanCheck {
         let outcome = match serde_json::from_slice::<AltchaPayload>(&bytes)? {
             AltchaPayload::Client(payload) => verify_client_payload(self, &payload)?,
             AltchaPayload::ServerSignature(payload) => {
-                let result =
-                    verify_server_signature(&payload, &self.hmac_secret).map_err(HumanCheckError::from)?;
+                let result = verify_server_signature(&payload, &self.hmac_secret)
+                    .map_err(HumanCheckError::from)?;
                 VerifyOutcome {
                     verified: result.verified,
                     expired: result.expired,
@@ -186,11 +184,7 @@ fn verify_client_payload(
 ) -> Result<VerifyOutcome, HumanCheckError> {
     let result = verify_solution(VerifySolutionOptions {
         hmac_key_signature_secret: Some(check.key_secret.clone()),
-        ..VerifySolutionOptions::new(
-            &payload.challenge,
-            &payload.solution,
-            &check.hmac_secret,
-        )
+        ..VerifySolutionOptions::new(&payload.challenge, &payload.solution, &check.hmac_secret)
     })?;
     Ok(VerifyOutcome {
         verified: result.verified,
@@ -213,7 +207,7 @@ fn unix_now() -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use altcha::{solve_challenge, SolveChallengeOptions};
+    use altcha::{SolveChallengeOptions, solve_challenge};
 
     use super::*;
 
@@ -224,7 +218,9 @@ mod tests {
     fn disabled_skips_verification() {
         let check = HumanCheck::disabled();
         assert!(!check.is_enabled());
-        check.verify_payload_or_skip("").expect("skip when disabled");
+        check
+            .verify_payload_or_skip("")
+            .expect("skip when disabled");
     }
 
     #[test]

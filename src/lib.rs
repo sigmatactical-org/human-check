@@ -165,8 +165,13 @@ impl HumanCheck {
         Ok(outcome)
     }
 
-    /// Verify when enabled; no-op when disabled.
+    /// Verify when enabled; no-op when disabled unless [`HUMAN_CHECK_REQUIRED`] is set.
     pub fn verify_payload_or_skip(&self, payload_b64: &str) -> Result<(), HumanCheckError> {
+        if !self.enabled && env_truthy("HUMAN_CHECK_REQUIRED") {
+            return Err(HumanCheckError::Config(
+                "human check is required but not configured".into(),
+            ));
+        }
         self.verify_payload(payload_b64).map(|_| ())
     }
 }
@@ -221,6 +226,17 @@ mod tests {
         check
             .verify_payload_or_skip("")
             .expect("skip when disabled");
+    }
+
+    #[test]
+    fn required_but_unconfigured_fails() {
+        temp_env::with_vars([("HUMAN_CHECK_REQUIRED", Some("true"))], || {
+            let check = HumanCheck::disabled();
+            assert!(matches!(
+                check.verify_payload_or_skip(""),
+                Err(HumanCheckError::Config(_))
+            ));
+        });
     }
 
     #[test]

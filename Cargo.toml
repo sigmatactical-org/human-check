@@ -1,10 +1,13 @@
 [package]
+
+
 name = "sigma-human-check"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.90.0"
 license = "MIT OR Apache-2.0"
 authors = ["Sigma Tactical Group contributors <https://github.com/sigmatactical-org>"]
+homepage = "https://sigmatactical.org"
 description = "Self-hosted proof-of-work human verification (ALTCHA) for Sigma public forms"
 publish = false
 

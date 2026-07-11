@@ -26,6 +26,12 @@ When both secrets are set and `HUMAN_CHECK_DISABLED` is not `true`, verification
 2. Include the ALTCHA widget on the form (`theme/assets/templates/widgets/human_check.html`).
 3. On `POST`, verify the `altcha` form field with [`HumanCheck::verify_payload`](src/lib.rs) before side effects.
 
+## Brand & artwork
+
+© Sigma Tactical Group. **All rights reserved.**
+
+The Sigma Tactical Group name, logos, marks, artwork, and visual identity are **proprietary**. They are not covered by this repository's source-code license. See [BRANDING.md](BRANDING.md).
+
 ## License
 
 MIT OR Apache-2.0

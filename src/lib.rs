@@ -11,7 +11,7 @@ use altcha::{
     create_challenge, verify_server_signature, verify_solution,
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use rand::Rng;
+use rand::RngExt;
 use thiserror::Error;
 
 const DEFAULT_ALGORITHM: &str = "PBKDF2/SHA-256";

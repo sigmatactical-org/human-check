@@ -1,5 +1,8 @@
 # sigma-human-check
 
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![MSRV](https://img.shields.io/badge/MSRV-1.97.0-blue.svg)](https://www.rust-lang.org)
+
 Self-hosted proof-of-work human verification for Sigma public forms, built on the OSS [ALTCHA](https://altcha.org) protocol.
 
 - **No web framework dependencies** — only `altcha`, `serde`, and `base64`

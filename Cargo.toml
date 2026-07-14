@@ -4,7 +4,7 @@
 name = "sigma-human-check"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.90.0"
+rust-version = "1.97.0"
 license = "MIT OR Apache-2.0"
 authors = ["Sigma Tactical Group contributors <https://github.com/sigmatactical-org>"]
 homepage = "https://sigmatactical.org"
@@ -16,10 +16,10 @@ publish = false
 [dependencies]
 altcha = "0.1.0"
 base64 = "0.22.1"
-rand = "0.9.2"
+rand = "0.10.2"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.145"
-thiserror = "2.0.17"
+serde_json = "1.0.150"
+thiserror = "2.0.18"
 
 [dev-dependencies]
 temp-env = "0.3.6"

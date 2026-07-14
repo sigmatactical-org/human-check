@@ -4,6 +4,8 @@
 //! solves a short challenge before submit; the server verifies cryptographically
 //! with no third-party API calls.
 
+#![forbid(unsafe_code)]
+
 mod altcha_payload;
 mod human_check_error;
 mod verify_outcome;

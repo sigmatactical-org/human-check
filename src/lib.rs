@@ -4,15 +4,21 @@
 //! solves a short challenge before submit; the server verifies cryptographically
 //! with no third-party API calls.
 
+mod altcha_payload;
+mod human_check_error;
+mod verify_outcome;
+pub(crate) use altcha_payload::AltchaPayload;
+pub use human_check_error::HumanCheckError;
+pub use verify_outcome::VerifyOutcome;
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use altcha::{
-    Challenge, CreateChallengeOptions, Payload, ServerSignaturePayload, VerifySolutionOptions,
-    create_challenge, verify_server_signature, verify_solution,
+    Challenge, CreateChallengeOptions, Payload, VerifySolutionOptions, create_challenge,
+    verify_server_signature, verify_solution,
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use rand::RngExt;
-use thiserror::Error;
 
 const DEFAULT_ALGORITHM: &str = "PBKDF2/SHA-256";
 const DEFAULT_COST: u32 = 5_000;
@@ -28,27 +34,6 @@ pub struct HumanCheck {
     key_secret: String,
     cost: u32,
     ttl_secs: u64,
-}
-
-#[derive(Debug, Error)]
-pub enum HumanCheckError {
-    #[error("human verification is required")]
-    Missing,
-    #[error("human verification failed")]
-    Rejected,
-    #[error("human verification misconfigured: {0}")]
-    Config(String),
-    #[error(transparent)]
-    Altcha(#[from] altcha::Error),
-    #[error(transparent)]
-    Json(#[from] serde_json::Error),
-}
-
-/// Result of verifying a widget payload.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VerifyOutcome {
-    pub verified: bool,
-    pub expired: bool,
 }
 
 impl HumanCheck {
@@ -174,13 +159,6 @@ impl HumanCheck {
         }
         self.verify_payload(payload_b64).map(|_| ())
     }
-}
-
-#[derive(serde::Deserialize)]
-#[serde(untagged)]
-enum AltchaPayload {
-    ServerSignature(ServerSignaturePayload),
-    Client(Payload),
 }
 
 fn verify_client_payload(

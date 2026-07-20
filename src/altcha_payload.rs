@@ -1,7 +1,5 @@
 //! [`AltchaPayload`].
 
-#[allow(unused_imports)]
-use super::*;
 use altcha::{Payload, ServerSignaturePayload};
 
 #[derive(serde::Deserialize)]

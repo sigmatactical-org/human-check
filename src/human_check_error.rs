@@ -1,7 +1,5 @@
 //! [`HumanCheckError`].
 
-#[allow(unused_imports)]
-use super::*;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

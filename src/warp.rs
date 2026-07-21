@@ -21,21 +21,18 @@ pub fn routes(
                     warp::reply::with_status("disabled", StatusCode::NOT_FOUND).into_response()
                 );
             }
-            let response: warp::reply::Response = match check.issue_challenge() {
-                Ok(challenge) => match serde_json::to_string(&challenge) {
-                    Ok(body) => warp::reply::with_header(
-                        warp::reply::Response::new(body.into()),
-                        "content-type",
-                        "application/json",
-                    )
-                    .into_response(),
-                    Err(_) => warp::reply::with_status(
-                        "challenge unavailable",
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                    )
-                    .into_response(),
-                },
-                Err(_) => warp::reply::with_status(
+            let challenge_json = check
+                .issue_challenge()
+                .ok()
+                .and_then(|challenge| serde_json::to_string(&challenge).ok());
+            let response = match challenge_json {
+                Some(body) => warp::reply::with_header(
+                    warp::reply::Response::new(body.into()),
+                    "content-type",
+                    "application/json",
+                )
+                .into_response(),
+                None => warp::reply::with_status(
                     "challenge unavailable",
                     StatusCode::INTERNAL_SERVER_ERROR,
                 )

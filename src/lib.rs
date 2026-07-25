@@ -41,8 +41,6 @@ mod tests {
     fn rejection_messages_are_user_safe() {
         assert!(rejection_message(&HumanCheckError::Missing).contains("wait"));
         assert!(rejection_message(&HumanCheckError::Rejected).contains("failed"));
-        assert!(
-            rejection_message(&HumanCheckError::Config("x".into())).contains("unavailable")
-        );
+        assert!(rejection_message(&HumanCheckError::Config("x".into())).contains("unavailable"));
     }
 }

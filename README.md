@@ -24,7 +24,7 @@ Used by **identity** (`POST /register`) and **contact** (`POST /contact`).
 
 `HumanCheck::from_env` recognises exactly two valid setups and **fails closed** on anything else: with both secrets set it enables verification, and with `HUMAN_CHECK_DISABLED=true` it skips verification and logs a warning. A missing or too-short secret is an error that must stop the service from starting, because a public form that quietly accepts unverified submissions looks healthy right up until the spam arrives.
 
-## Integration
+## Integration notes
 
 1. Call [`HumanCheck::from_env`](src/human_check.rs) once at startup and propagate its error out of `main`.
 2. Expose `GET /human-check/challenge` returning JSON from [`HumanCheck::issue_challenge`](src/human_check.rs).

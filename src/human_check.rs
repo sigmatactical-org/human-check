@@ -15,7 +15,10 @@ use crate::altcha_payload::AltchaPayload;
 const DEFAULT_ALGORITHM: &str = "PBKDF2/SHA-256";
 const DEFAULT_COST: u32 = 5_000;
 #[cfg(test)]
-const TEST_COST: u32 = 1_000;
+// Kept low so the roundtrip test's solve time (which iterates up to the random
+// counter, running PBKDF2 per attempt) stays far below the solver's 90s timeout
+// regardless of the drawn counter — otherwise the test flakes under load.
+const TEST_COST: u32 = 10;
 const DEFAULT_TTL_SECS: u64 = 600;
 const MIN_SECRET_LEN: usize = 32;
 

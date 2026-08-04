@@ -39,17 +39,36 @@ impl HumanCheck {
     /// | `HUMAN_CHECK_KEY_SECRET` | Key signature secret (≥32 chars) when enabled |
     /// | `HUMAN_CHECK_COST` | PoW cost (default `5000`) |
     /// | `HUMAN_CHECK_TTL_SECS` | Challenge lifetime in seconds (default `600`) |
-    #[must_use]
-    pub fn from_env() -> Self {
+    ///
+    /// Call this once while starting up and let the error stop the process.
+    /// There are only two safe outcomes for bot protection on a public form:
+    /// configured, or switched off on purpose. Quietly settling for "off"
+    /// because a secret is missing leaves the form open with nothing in the logs
+    /// to say so, which is how an unprotected form survives a deploy.
+    ///
+    /// # Errors
+    ///
+    /// [`HumanCheckError::Config`] when the check is not explicitly disabled and
+    /// either secret is absent or shorter than 32 characters.
+    pub fn from_env() -> Result<Self, HumanCheckError> {
         if env_truthy("HUMAN_CHECK_DISABLED") {
-            return Self::disabled();
+            tracing::warn!(
+                "human check disabled by HUMAN_CHECK_DISABLED; public forms accept submissions \
+                 without verification"
+            );
+            return Ok(Self::disabled());
         }
         let hmac_secret = std::env::var("HUMAN_CHECK_HMAC_SECRET").unwrap_or_default();
         let key_secret = std::env::var("HUMAN_CHECK_KEY_SECRET").unwrap_or_default();
-        if hmac_secret.len() < MIN_SECRET_LEN || key_secret.len() < MIN_SECRET_LEN {
-            return Self::disabled();
+        if let Some(problem) = secret_problem("HUMAN_CHECK_HMAC_SECRET", &hmac_secret)
+            .or_else(|| secret_problem("HUMAN_CHECK_KEY_SECRET", &key_secret))
+        {
+            return Err(HumanCheckError::Config(format!(
+                "{problem}; set both secrets or set HUMAN_CHECK_DISABLED=true to accept \
+                 unverified submissions"
+            )));
         }
-        Self {
+        Ok(Self {
             enabled: true,
             hmac_secret,
             key_secret,
@@ -61,7 +80,7 @@ impl HumanCheck {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(DEFAULT_TTL_SECS),
-        }
+        })
     }
 
     /// Explicit configuration for tests.
@@ -77,6 +96,10 @@ impl HumanCheck {
         }
     }
 
+    /// A check that accepts every submission, for tests and for callers that
+    /// have already decided to run a form unverified. Production code should go
+    /// through [`from_env`](Self::from_env) so the choice comes from the
+    /// environment and gets logged.
     #[must_use]
     pub fn disabled() -> Self {
         Self {
@@ -88,6 +111,8 @@ impl HumanCheck {
         }
     }
 
+    /// Whether submissions are verified; templates use this to decide if the
+    /// widget belongs on the form.
     #[must_use]
     pub fn is_enabled(&self) -> bool {
         self.enabled
@@ -113,7 +138,17 @@ impl HumanCheck {
     }
 
     /// Verify the Base64-encoded `altcha` form field from the widget.
-    pub(crate) fn verify_payload(&self, payload_b64: &str) -> Result<(), HumanCheckError> {
+    ///
+    /// A no-op when the check is disabled, which [`from_env`](Self::from_env)
+    /// only allows as a deliberate choice.
+    ///
+    /// # Errors
+    ///
+    /// [`HumanCheckError::Missing`] for an empty field (the widget had not
+    /// finished), [`HumanCheckError::Rejected`] for a payload that does not
+    /// verify. Pass either to [`crate::rejection_message`] for wording safe to
+    /// show a visitor.
+    pub fn verify_payload(&self, payload_b64: &str) -> Result<(), HumanCheckError> {
         if !self.enabled {
             return Ok(());
         }
@@ -137,16 +172,20 @@ impl HumanCheck {
         }
         Ok(())
     }
+}
 
-    /// Verify when enabled; no-op when disabled unless `HUMAN_CHECK_REQUIRED` is set.
-    pub fn verify_payload_or_skip(&self, payload_b64: &str) -> Result<(), HumanCheckError> {
-        if !self.enabled && env_truthy("HUMAN_CHECK_REQUIRED") {
-            return Err(HumanCheckError::Config(
-                "human check is required but not configured".into(),
-            ));
-        }
-        self.verify_payload(payload_b64)
+/// What is wrong with `value` as a secret, or `None` when it is usable.
+fn secret_problem(name: &str, value: &str) -> Option<String> {
+    if value.is_empty() {
+        return Some(format!("{name} is not set"));
     }
+    if value.len() < MIN_SECRET_LEN {
+        return Some(format!(
+            "{name} is {} characters; at least {MIN_SECRET_LEN} are required",
+            value.len()
+        ));
+    }
+    None
 }
 
 fn verify_client_payload(check: &HumanCheck, payload: &Payload) -> Result<bool, HumanCheckError> {
@@ -179,24 +218,70 @@ mod tests {
     const HMAC: &str = "test-hmac-secret-at-least-32-characters";
     const KEY: &str = "test-key-secret-at-least-32-characters!!";
 
+    /// Every `from_env` case has to run with the whole variable set controlled,
+    /// or a secret left in the developer's shell decides the outcome.
+    fn with_env(vars: [(&str, Option<&str>); 3], assert: impl FnOnce()) {
+        temp_env::with_vars(vars, assert);
+    }
+
     #[test]
     fn disabled_skips_verification() {
         let check = HumanCheck::disabled();
         assert!(!check.is_enabled());
-        check
-            .verify_payload_or_skip("")
-            .expect("skip when disabled");
+        check.verify_payload("").expect("skip when disabled");
     }
 
     #[test]
-    fn required_but_unconfigured_fails() {
-        temp_env::with_vars([("HUMAN_CHECK_REQUIRED", Some("true"))], || {
-            let check = HumanCheck::disabled();
-            assert!(matches!(
-                check.verify_payload_or_skip(""),
-                Err(HumanCheckError::Config(_))
-            ));
-        });
+    fn from_env_refuses_to_start_without_secrets() {
+        with_env(
+            [
+                ("HUMAN_CHECK_DISABLED", None),
+                ("HUMAN_CHECK_HMAC_SECRET", None),
+                ("HUMAN_CHECK_KEY_SECRET", None),
+            ],
+            || {
+                let err = HumanCheck::from_env()
+                    .expect_err("an unconfigured public form must not come up unprotected");
+                let HumanCheckError::Config(message) = err else {
+                    panic!("expected a configuration error");
+                };
+                assert!(message.contains("HUMAN_CHECK_HMAC_SECRET"), "{message}");
+                assert!(message.contains("HUMAN_CHECK_DISABLED"), "{message}");
+            },
+        );
+    }
+
+    #[test]
+    fn from_env_refuses_a_too_short_secret() {
+        with_env(
+            [
+                ("HUMAN_CHECK_DISABLED", None),
+                ("HUMAN_CHECK_HMAC_SECRET", Some(HMAC)),
+                ("HUMAN_CHECK_KEY_SECRET", Some("too-short")),
+            ],
+            || {
+                let err = HumanCheck::from_env().expect_err("a 9-character secret is not a secret");
+                assert!(
+                    matches!(&err, HumanCheckError::Config(m) if m.contains("HUMAN_CHECK_KEY_SECRET")),
+                    "got {err:?}"
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn from_env_enables_with_both_secrets() {
+        with_env(
+            [
+                ("HUMAN_CHECK_DISABLED", None),
+                ("HUMAN_CHECK_HMAC_SECRET", Some(HMAC)),
+                ("HUMAN_CHECK_KEY_SECRET", Some(KEY)),
+            ],
+            || {
+                let check = HumanCheck::from_env().expect("both secrets present");
+                assert!(check.is_enabled());
+            },
+        );
     }
 
     #[test]
@@ -225,8 +310,16 @@ mod tests {
 
     #[test]
     fn from_env_disabled_flag() {
-        temp_env::with_vars([("HUMAN_CHECK_DISABLED", Some("true"))], || {
-            assert!(!HumanCheck::from_env().is_enabled());
-        });
+        with_env(
+            [
+                ("HUMAN_CHECK_DISABLED", Some("true")),
+                ("HUMAN_CHECK_HMAC_SECRET", None),
+                ("HUMAN_CHECK_KEY_SECRET", None),
+            ],
+            || {
+                let check = HumanCheck::from_env().expect("explicitly disabled is allowed");
+                assert!(!check.is_enabled());
+            },
+        );
     }
 }

@@ -22,13 +22,14 @@ Used by **identity** (`POST /register`) and **contact** (`POST /contact`).
 | `HUMAN_CHECK_COST` | PoW difficulty (default `5000`) |
 | `HUMAN_CHECK_TTL_SECS` | Challenge lifetime in seconds (default `600`) |
 
-When both secrets are set and `HUMAN_CHECK_DISABLED` is not `true`, verification is enabled.
+`HumanCheck::from_env` recognises exactly two valid setups and **fails closed** on anything else: with both secrets set it enables verification, and with `HUMAN_CHECK_DISABLED=true` it skips verification and logs a warning. A missing or too-short secret is an error that must stop the service from starting, because a public form that quietly accepts unverified submissions looks healthy right up until the spam arrives.
 
 ## Integration
 
-1. Expose `GET /human-check/challenge` returning JSON from [`HumanCheck::issue_challenge`](src/lib.rs).
-2. Include the ALTCHA widget on the form (`theme/assets/templates/widgets/human_check.html`).
-3. On `POST`, verify the `altcha` form field with [`HumanCheck::verify_payload`](src/lib.rs) before side effects.
+1. Call [`HumanCheck::from_env`](src/human_check.rs) once at startup and propagate its error out of `main`.
+2. Expose `GET /human-check/challenge` returning JSON from [`HumanCheck::issue_challenge`](src/human_check.rs).
+3. Include the ALTCHA widget on the form (`theme/assets/templates/widgets/human_check.html`).
+4. On `POST`, verify the `altcha` form field with [`HumanCheck::verify_payload`](src/human_check.rs) before side effects, turning an error into visitor-facing wording with [`rejection_message`](src/lib.rs).
 
 ## Brand & artwork
 
